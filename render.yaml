@@ -1,0 +1,64 @@
+# Render Blueprint Configuration
+# This file can be used to define your service in Render
+# Reference: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: invoice-generator-api
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter # or free, starter, standard, pro
+    region: oregon # or singapore, frankfurt, ohio, oregon
+    buildCommand: docker build -t invoice-generator-api .
+    startCommand: docker run -p $PORT:8080 invoice-generator-api
+    envVars:
+      # Server Configuration
+      - key: SERVER_PORT
+        value: 8080
+        sync: false
+      
+      # Database Configuration - REQUIRED
+      - key: MONGODB_URI
+        value: mongodb+srv://username:password@cluster.mongodb.net/invoicedb
+        sync: false
+      
+      # Clerk Configuration - REQUIRED
+      - key: CLERK_ISSUER
+        value: https://useful-calf-13.clerk.accounts.dev
+        sync: false
+      
+      - key: CLERK_JWKS_URL
+        value: https://useful-calf-13.clerk.accounts.dev/.well-known/jwks.json
+        sync: false
+      
+      - key: CLERK_WEBHOOK_SECRET
+        value: sk_test_tFzomi6BkCQy8YTeKXByPs84nxSIDwkkAgghFDml6t
+        sync: false
+      
+      # Email Configuration - REQUIRED
+      - key: MAIL_HOST
+        value: smtp-relay.brevo.com
+        sync: false
+      
+      - key: MAIL_PORT
+        value: 587
+        sync: false
+      
+      - key: MAIL_USERNAME
+        value: 925f2e001@smtp-brevo.com
+        sync: false
+      
+      - key: MAIL_PASSWORD
+        value: Hf13FI8qkT7C5h4U
+        sync: false
+      
+      - key: MAIL_FROM
+        value: vipinshivhare804@gmail.com
+        sync: false
+      
+      # CORS Configuration
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://invoicee-generator.netlify.app
+        sync: false
+

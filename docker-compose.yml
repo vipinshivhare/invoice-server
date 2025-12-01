@@ -1,0 +1,31 @@
+services:
+  invoice-generator-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: invoice-generator-api
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      # Server Configuration
+      - SERVER_PORT=${SERVER_PORT:-8080}
+      
+      # Database Configuration
+      - MONGODB_URI=${MONGODB_URI}
+      
+      # Clerk Configuration
+      - CLERK_ISSUER=${CLERK_ISSUER}
+      - CLERK_JWKS_URL=${CLERK_JWKS_URL}
+      - CLERK_WEBHOOK_SECRET=${CLERK_WEBHOOK_SECRET}
+      
+      # Email Configuration
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM=${MAIL_FROM}
+      
+      # CORS Configuration
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-https://invoicee-generator.netlify.app}
+    restart: unless-stopped
+
