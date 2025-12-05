@@ -1,34 +1,30 @@
-# Multi-stage build for Spring Boot application
-FROM maven:3.9-eclipse-temurin-21 AS build
-
+# Multi-stage build for Spring Boot app using Maven + Temurin 23
+FROM maven:3.9.9-eclipse-temurin-23 AS build
 WORKDIR /app
 
-# Copy pom.xml and download dependencies (this layer will be cached if pom.xml doesn't change)
+# Copy pom first to cache dependencies
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+RUN mvn -B dependency:go-offline
 
-# Copy source code and build the application
+# Copy source and build
 COPY src ./src
-RUN mvn clean package -DskipTests
+# Optional debug: uncomment to print Java/Maven versions inside the build container
+# RUN java -version && javac -version && mvn -v
+RUN mvn -B clean package -DskipTests
 
-# Runtime stage
-FROM eclipse-temurin:21-jre-alpine
-
+# Runtime stage (Temurin 23 JRE)
+FROM eclipse-temurin:23-jre
 WORKDIR /app
 
-# Create a non-root user for security
-RUN addgroup -S spring && adduser -S spring -G spring
+# Create non-root user (portable for Debian-based image)
+RUN groupadd -r spring && useradd -r -g spring spring
 USER spring:spring
 
-# Copy the JAR file from build stage
-COPY --from=build /app/target/invoicegeneratorapi-*.jar app.jar
+# Copy the built JAR from build stage
+COPY --from=build /app/target/*.jar app.jar
 
-# Expose the application port
 EXPOSE 8080
 
-# Set JVM options for containerized environment
 ENV JAVA_OPTS="-Xmx512m -Xms256m"
 
-# Run the application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
-
