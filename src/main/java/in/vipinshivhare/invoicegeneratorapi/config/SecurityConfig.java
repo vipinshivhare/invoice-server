@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -31,7 +30,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception{
-        http.cors(Customizer.withDefaults())
+        http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth ->
                         auth.requestMatchers("/", "/health", "/api/webhooks/**").permitAll()
@@ -52,8 +51,10 @@ public class SecurityConfig {
         List<String> origins = Arrays.asList(allowedOrigins.split(","));
         config.setAllowedOrigins(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        // Allow common headers that browsers send
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"));
         config.setAllowCredentials(true);
+        config.setMaxAge(3600L); // Cache preflight for 1 hour
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

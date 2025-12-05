@@ -34,6 +34,12 @@ public class ClerkJwtAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
+        // Allow OPTIONS requests (CORS preflight) to pass through
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         if (request.getRequestURI().contains("/api/webhooks")) {
             filterChain.doFilter(request, response);
             return;
