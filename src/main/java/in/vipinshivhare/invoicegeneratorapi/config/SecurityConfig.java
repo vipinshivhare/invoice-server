@@ -26,7 +26,7 @@ public class SecurityConfig {
 
     private final ClerkJwtAuthFilter jwtAuthFilter;
 
-    @Value("${app.cors.allowed-origins}")
+    @Value("${app.cors.allowed-origins:https://invoicee-generator.netlify.app,http://localhost:5173}")
     private String allowedOrigins;
 
     @Bean
@@ -34,7 +34,7 @@ public class SecurityConfig {
         http.cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth ->
-                        auth.requestMatchers("/health", "/api/webhooks/**").permitAll()
+                        auth.requestMatchers("/", "/health", "/api/webhooks/**").permitAll()
                                 .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
