@@ -14,7 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
-@CrossOrigin(origins = "*") // for frontend access
+@CrossOrigin(origins = "https://invoicee-generator.netlify.app, http://localhost:5173") // for frontend access
 @RestController
 @RequestMapping("/api/invoices")
 @RequiredArgsConstructor
