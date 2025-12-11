@@ -33,7 +33,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception{
-        // Apply CORS configuration source (used by Spring's cors support)
+        // Ensure CORS config applied and CORS filter runs before auth filters
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
@@ -44,14 +44,11 @@ public class SecurityConfig {
                         // Everything else requires authentication
                         .anyRequest().authenticated()
                 )
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
-
-        // Ensure CorsFilter runs before security filters so it handles preflight and sets headers
-        http.addFilterBefore(corsFilter(), UsernamePasswordAuthenticationFilter.class);
-
-        // Add JWT filter AFTER the CorsFilter (explicit ordering) so that OPTIONS requests
-        // are not blocked by authentication logic.
-        http.addFilterAfter(jwtAuthFilter, CorsFilter.class);
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // Add CORS filter explicitly before security filters to ensure headers present
+                .addFilterBefore(corsFilter(), UsernamePasswordAuthenticationFilter.class)
+                // Add your JWT filter after CORS filter
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

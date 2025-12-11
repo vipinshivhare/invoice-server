@@ -37,13 +37,9 @@ public class ClerkJwtAuthFilter extends OncePerRequestFilter {
 
     private final ClerkJwksProvider jwksProvider;
 
-    // Public endpoints (prefix-match supported)
+    // public endpoints that should NOT require auth
     private final List<String> PUBLIC_PATHS = List.of(
-            "/",
-            "/health",
-            "/actuator",
-            "/api/webhooks",
-            "/error" // <-- important for CORS & fallback
+            "/", "/health", "/actuator/health", "/api/webhooks"
     );
 
     @Override
@@ -53,56 +49,47 @@ public class ClerkJwtAuthFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         String method = request.getMethod();
 
-        // ---------------------------------------------
-        // 1️⃣ ALWAYS allow OPTIONS preflight
-        // ---------------------------------------------
+        // 1) Allow preflight OPTIONS immediately
         if (HttpMethod.OPTIONS.matches(method)) {
-            log.debug("CORS Preflight allowed: {}", path);
             filterChain.doFilter(request, response);
             return;
         }
 
-        // ---------------------------------------------
-        // 2️⃣ Allow PUBLIC paths (prefix match)
-        // ---------------------------------------------
+        // 2) Bypass public paths (exact or prefix match)
         for (String pub : PUBLIC_PATHS) {
-            if (path.equals(pub) || path.startsWith(pub + "/")) {
-                log.debug("Public path allowed without auth: {}", path);
+            if (path.equals(pub) || path.startsWith(pub + "/") || path.startsWith(pub + "?")) {
                 filterChain.doFilter(request, response);
                 return;
             }
         }
 
-        // ---------------------------------------------
-        // 3️⃣ Protected routes must have Authorization header
-        // ---------------------------------------------
+        // 3) Normal JWT handling for protected routes
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            log.debug("Missing/invalid Authorization header for {}", path);
-            SecurityContextHolder.clearContext();
-
-            // This must be 401, not 403
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            // No token — respond with 401 (Unauthorized)
+            log.debug("Missing/invalid Authorization header for request {} {}", method, path);
             response.setContentType(MediaType.TEXT_PLAIN_VALUE);
-            response.getWriter().write("Missing or invalid Authorization header");
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Authorization header missing or invalid");
             return;
         }
 
         try {
             String token = authHeader.substring(7);
 
-            // decode header → extract kid
-            String[] parts = token.split("\\.");
-            if (parts.length < 2) throw new IllegalArgumentException("Invalid JWT");
-
-            String headerJson = new String(Base64.getUrlDecoder().decode(parts[0]));
+            // parse header to get kid
+            String[] chunks = token.split("\\.");
+            if (chunks.length < 2) {
+                throw new IllegalArgumentException("Invalid JWT format");
+            }
+            String headerJson = new String(Base64.getUrlDecoder().decode(chunks[0]));
             ObjectMapper mapper = new ObjectMapper();
             JsonNode headerNode = mapper.readTree(headerJson);
             String kid = headerNode.has("kid") ? headerNode.get("kid").asText() : null;
 
-            if (kid == null) throw new IllegalArgumentException("Missing kid");
+            if (kid == null) {
+                throw new IllegalArgumentException("kid missing in token header");
+            }
 
-            // fetch public key
             PublicKey publicKey = jwksProvider.getPublicKey(kid);
 
             Claims claims = Jwts.parserBuilder()
@@ -115,23 +102,16 @@ public class ClerkJwtAuthFilter extends OncePerRequestFilter {
 
             String clerkUserId = claims.getSubject();
 
-            UsernamePasswordAuthenticationToken authToken =
-                    new UsernamePasswordAuthenticationToken(
-                            clerkUserId,
-                            null,
-                            Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
-                    );
+            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+                    clerkUserId, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")));
 
-            SecurityContextHolder.getContext().setAuthentication(authToken);
+            SecurityContextHolder.getContext().setAuthentication(authenticationToken);
             filterChain.doFilter(request, response);
-
         } catch (Exception e) {
             log.warn("JWT verification failed for {} {}: {}", method, path, e.getMessage());
-            SecurityContextHolder.clearContext();
-
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType(MediaType.TEXT_PLAIN_VALUE);
-            response.getWriter().write("Invalid JWT token");
+            // Use 401 for invalid token (not 403) — client can try re-auth if needed
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT token");
         }
     }
 }
