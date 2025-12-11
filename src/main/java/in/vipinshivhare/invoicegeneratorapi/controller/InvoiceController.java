@@ -4,6 +4,7 @@ import in.vipinshivhare.invoicegeneratorapi.entity.Invoice;
 import in.vipinshivhare.invoicegeneratorapi.service.EmailService;
 import in.vipinshivhare.invoicegeneratorapi.service.InvoiceService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -17,6 +18,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/invoices")
 @RequiredArgsConstructor
+@Slf4j
 public class InvoiceController {
 
     private final InvoiceService service;
@@ -50,8 +52,11 @@ public class InvoiceController {
             emailService.sendInvoiceEmail(customerEmail, file);
             return ResponseEntity.ok().body("Invoice sent successfully!");
         } catch (Exception e) {
+            // Log the full error for server-side debugging (visible in Render logs)
+            log.error("Failed to send invoice email to {}", customerEmail, e);
+            String message = e.getMessage() != null ? e.getMessage() : "Unknown error";
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Failed to send invoice.");
+                    .body("Failed to send invoice. Error: " + message);
         }
     }
 }
