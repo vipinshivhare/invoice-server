@@ -3,7 +3,6 @@ package in.vipinshivhare.invoicegeneratorapi.controller;
 import in.vipinshivhare.invoicegeneratorapi.entity.Invoice;
 import in.vipinshivhare.invoicegeneratorapi.service.EmailService;
 import in.vipinshivhare.invoicegeneratorapi.service.InvoiceService;
-import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -17,12 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.util.List;
 
-@CrossOrigin(
-        origins = {
-                "https://invoicee-generator.netlify.app",
-                "http://localhost:5173"
-        }
-)
+@CrossOrigin(origins = "https://invoicee-generator.netlify.app, http://localhost:5173") // for frontend access
 @RestController
 @RequestMapping("/api/invoices")
 @RequiredArgsConstructor
@@ -39,24 +33,20 @@ public class InvoiceController {
 
     @GetMapping
     public ResponseEntity<List<Invoice>> fetchInvoices(Authentication authentication) {
+        System.out.println(authentication.getName());
         return ResponseEntity.ok(service.fetchInvoices(authentication.getName()));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> removeInvoice(@PathVariable String id,
-                                              Authentication authentication) {
+    public ResponseEntity<Void> removeInvoice(@PathVariable String id, Authentication authentication) {
         if (authentication.getName() != null) {
             service.removeInvoice(authentication.getName(), id);
             return ResponseEntity.noContent().build();
         }
-        throw new ResponseStatusException(
-                HttpStatus.FORBIDDEN,
-                "User does not have permission to access this resource"
-        );
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "User does not have permission to access this resource");
     }
 
-    // 🔥 FINAL FIX: ASYNC EMAIL (no blocking, no timeout)
-    @Operation(summary = "Send invoice PDF via email")
     @PostMapping(
             value = "/sendinvoice",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE
@@ -66,8 +56,8 @@ public class InvoiceController {
             @RequestParam("email") String customerEmail
     ) throws IOException {
 
-        byte[] fileBytes = file.getBytes();           // ✅ copy while request alive
-        String filename = file.getOriginalFilename(); // ✅ safe
+        byte[] fileBytes = file.getBytes();
+        String filename = file.getOriginalFilename();
 
         emailService.sendInvoiceEmailAsync(
                 customerEmail,
@@ -75,6 +65,7 @@ public class InvoiceController {
                 filename
         );
 
-        return ResponseEntity.ok("Invoice email queued successfully!");
+        return ResponseEntity.ok("Invoice email successfully!");
     }
+
 }

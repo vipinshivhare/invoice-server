@@ -1,139 +1,148 @@
-//package in.vipinshivhare.invoicegeneratorapi.service;
-//
-//import jakarta.mail.MessagingException;
-//import jakarta.mail.internet.MimeMessage;
-//import lombok.RequiredArgsConstructor;
-//import org.springframework.beans.factory.annotation.Value;
-//import org.springframework.core.io.ByteArrayResource;
-//import org.springframework.mail.javamail.JavaMailSender;
-//import org.springframework.mail.javamail.MimeMessageHelper;
-//import org.springframework.stereotype.Service;
-//import org.springframework.web.multipart.MultipartFile;
-//
-//import java.io.IOException;
-//
-//@Service
-//@RequiredArgsConstructor
-//public class EmailService {
-//
-//    private final JavaMailSender mailSender;
-//
-//    @Value("${spring.mail.properties.mail.smtp.from:}")
-//    private String fromEmail;
-//
-//    // Fallback when MAIL_FROM is not provided in the environment
-//    @Value("${spring.mail.username:}")
-//    private String fallbackFromEmail;
-//
-//    public void sendInvoiceEmail(String toEmail, MultipartFile file) throws MessagingException, IOException {
-//        MimeMessage message = mailSender.createMimeMessage();
-//
-//        MimeMessageHelper helper = new MimeMessageHelper(message, true);
-//        helper.setFrom(resolveFromEmail());
-//        helper.setTo(toEmail);
-//        helper.setSubject("Your Invoice");
-//        helper.setText("Dear Customer,\n\nPlease find attached your invoice.\n\nThank you!");
-//
-//        helper.addAttachment(file.getOriginalFilename(), new ByteArrayResource(file.getBytes()));
-//
-//        mailSender.send(message);
-//    }
-//
-//    /**
-//     * Render deployment sometimes misses MAIL_FROM; fall back to username.
-//     */
-//    private String resolveFromEmail() {
-//        if (hasText(fromEmail)) {
-//            return fromEmail;
-//        }
-//        if (hasText(fallbackFromEmail)) {
-//            return fallbackFromEmail;
-//        }
-//        throw new IllegalStateException("Email sender not configured (MAIL_FROM or MAIL_USERNAME missing)");
-//    }
-//
-//    private boolean hasText(String value) {
-//        return value != null && !value.trim().isEmpty();
-//    }
-//}
-
-
-
 package in.vipinshivhare.invoicegeneratorapi.service;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.http.*;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.client.RestTemplate;
 
-import java.io.IOException;
+import java.util.Base64;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    private final RestTemplate restTemplate = new RestTemplate();
 
-    @Value("${spring.mail.properties.mail.smtp.from:}")
-    private String fromEmail;
+    @Value("${BREVO_API_KEY}")
+    private String brevoApiKey;
 
-    @Value("${spring.mail.username:}")
-    private String fallbackFromEmail;
+    @Value("${BREVO_SENDER_EMAIL}")
+    private String senderEmail;
 
-    // ✅ ASYNC METHOD (safe)
+    @Value("${BREVO_SENDER_NAME}")
+    private String senderName;
+
+    private static final String BREVO_URL =
+            "https://api.brevo.com/v3/smtp/email";
+
+    // 🔥 ASYNC + HTTP (Render-safe)
     @Async
     public void sendInvoiceEmailAsync(
             String toEmail,
             byte[] fileBytes,
-            String originalFilename
+            String filename
     ) {
         try {
-            sendInternal(toEmail, fileBytes, originalFilename);
-            log.info("Invoice email sent successfully to {}", toEmail);
+            sendInternal(toEmail, fileBytes, filename);
+            log.info("Brevo email sent to {}", toEmail);
         } catch (Exception e) {
-            log.error("Failed to send invoice email to {}", toEmail, e);
+            log.error("Brevo email failed for {}", toEmail, e);
         }
     }
 
     private void sendInternal(
             String toEmail,
             byte[] fileBytes,
-            String originalFilename
-    ) throws MessagingException {
+            String filename
+    ) {
+        String base64File = Base64.getEncoder().encodeToString(fileBytes);
 
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true);
-
-        helper.setFrom(resolveFromEmail());
-        helper.setTo(toEmail);
-        helper.setSubject("Your Invoice");
-        helper.setText(
-                "Dear Customer,\n\nPlease find attached your invoice.\n\nThank you!"
+        Map<String, Object> payload = Map.of(
+                "sender", Map.of(
+                        "email", senderEmail,
+                        "name", senderName   // e.g. "Invoice Generator"
+                ),
+                "to", List.of(
+                        Map.of("email", toEmail)
+                ),
+                "subject", "Your Invoice is Ready 🧾",
+                "htmlContent",
+                """
+                <div style="font-family: Arial, Helvetica, sans-serif; 
+                            max-width: 600px; 
+                            margin: 0 auto; 
+                            border: 1px solid #e5e7eb; 
+                            border-radius: 8px; 
+                            overflow: hidden;">
+                            
+                    <div style="background-color: #111827; 
+                                color: #ffffff; 
+                                padding: 16px 24px;">
+                        <h2 style="margin: 0;">Invoice Generated</h2>
+                    </div>
+        
+                    <div style="padding: 24px; color: #111827;">
+                        <p style="font-size: 16px;">
+                            Dear Customer,
+                        </p>
+        
+                        <p style="font-size: 14px; line-height: 1.6;">
+                            Thank you for your business. Please find your invoice attached to this email.
+                            If you have any questions regarding this invoice, feel free to reach out to us.
+                        </p>
+        
+                        <div style="margin: 20px 0; 
+                                    padding: 16px; 
+                                    background-color: #f9fafb; 
+                                    border-left: 4px solid #2563eb;">
+                            <p style="margin: 0; font-size: 14px;">
+                                📎 <strong>Attachment:</strong> Your invoice PDF
+                            </p>
+                        </div>
+        
+                        <p style="font-size: 14px;">
+                            We appreciate your trust and look forward to serving you again.
+                        </p>
+        
+                        <p style="margin-top: 32px; font-size: 14px;">
+                            Best regards,<br>
+                            <strong>%s</strong>
+                        </p>
+                    </div>
+        
+                    <div style="background-color: #f3f4f6; 
+                                padding: 12px 24px; 
+                                font-size: 12px; 
+                                color: #6b7280; 
+                                text-align: center;">
+                        This is an automated email. Please do not reply directly.
+                    </div>
+                </div>
+                """.formatted(senderName),
+                "attachment", List.of(
+                        Map.of(
+                                "content", base64File,
+                                "name", filename
+                        )
+                )
         );
 
-        helper.addAttachment(
-                originalFilename,
-                new ByteArrayResource(fileBytes)
-        );
 
-        mailSender.send(message);
-    }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("api-key", brevoApiKey);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
 
-    private String resolveFromEmail() {
-        if (hasText(fromEmail)) return fromEmail;
-        if (hasText(fallbackFromEmail)) return fallbackFromEmail;
-        throw new IllegalStateException("Email sender not configured");
-    }
+        HttpEntity<Map<String, Object>> request =
+                new HttpEntity<>(payload, headers);
 
-    private boolean hasText(String v) {
-        return v != null && !v.trim().isEmpty();
+        ResponseEntity<String> response =
+                restTemplate.postForEntity(
+                        BREVO_URL,
+                        request,
+                        String.class
+                );
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException(
+                    "Brevo API error: " + response.getBody()
+            );
+        }
     }
 }
