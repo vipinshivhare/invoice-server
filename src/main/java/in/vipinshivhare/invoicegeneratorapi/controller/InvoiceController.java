@@ -3,9 +3,11 @@ package in.vipinshivhare.invoicegeneratorapi.controller;
 import in.vipinshivhare.invoicegeneratorapi.entity.Invoice;
 import in.vipinshivhare.invoicegeneratorapi.service.EmailService;
 import in.vipinshivhare.invoicegeneratorapi.service.InvoiceService;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -14,7 +16,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
-@CrossOrigin(origins = "https://invoicee-generator.netlify.app, http://localhost:5173") // for frontend access
+@CrossOrigin(
+        origins = {
+                "https://invoicee-generator.netlify.app",
+                "http://localhost:5173"
+        }
+)
 @RestController
 @RequestMapping("/api/invoices")
 @RequiredArgsConstructor
@@ -31,32 +38,40 @@ public class InvoiceController {
 
     @GetMapping
     public ResponseEntity<List<Invoice>> fetchInvoices(Authentication authentication) {
-        System.out.println(authentication.getName());
         return ResponseEntity.ok(service.fetchInvoices(authentication.getName()));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> removeInvoice(@PathVariable String id, Authentication authentication) {
+    public ResponseEntity<Void> removeInvoice(@PathVariable String id,
+                                              Authentication authentication) {
         if (authentication.getName() != null) {
             service.removeInvoice(authentication.getName(), id);
             return ResponseEntity.noContent().build();
         }
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                "User does not have permission to access this resource");
+        throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "User does not have permission to access this resource"
+        );
     }
 
-    @PostMapping("/sendinvoice")
-    public ResponseEntity<?> sendInvoice(@RequestPart("file") MultipartFile file,
-            @RequestPart("email") String customerEmail) {
+    // 🔥 UPDATED METHOD FOR SWAGGER FILE PICKER
+    @Operation(summary = "Send invoice PDF via email")
+    @PostMapping(
+            value = "/sendinvoice",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    public ResponseEntity<String> sendInvoice(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("email") String customerEmail
+    ) {
         try {
             emailService.sendInvoiceEmail(customerEmail, file);
-            return ResponseEntity.ok().body("Invoice sent successfully!");
+            return ResponseEntity.ok("Invoice sent successfully!");
         } catch (Exception e) {
-            // Log the full error for server-side debugging (visible in Render logs)
             log.error("Failed to send invoice email to {}", customerEmail, e);
-            String message = e.getMessage() != null ? e.getMessage() : "Unknown error";
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Failed to send invoice. Error: " + message);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to send invoice: " + e.getMessage());
         }
     }
 }

@@ -38,7 +38,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         // Allow public endpoints
-                        .requestMatchers("/", "/health", "/api/webhooks/**").permitAll()
+                        .requestMatchers("/", "/health", "/api/webhooks/**",
+                                "/api/invoices/sendinvoice", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         // Allow preflight OPTIONS for all endpoints
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // Everything else requires authentication

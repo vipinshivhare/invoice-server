@@ -39,7 +39,14 @@ public class ClerkJwtAuthFilter extends OncePerRequestFilter {
 
     // public endpoints that should NOT require auth
     private final List<String> PUBLIC_PATHS = List.of(
-            "/", "/health", "/actuator/health", "/api/webhooks"
+            "/",
+            "/health",
+            "/actuator/health",
+            "/api/webhooks",
+            "/swagger-ui",
+            "/v3/api-docs",
+            "/api/invoices/sendinvoice"
+
     );
 
     @Override
