@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.util.List;
 
 @CrossOrigin(
@@ -54,7 +55,7 @@ public class InvoiceController {
         );
     }
 
-    // 🔥 UPDATED METHOD FOR SWAGGER FILE PICKER
+    // 🔥 FINAL FIX: ASYNC EMAIL (no blocking, no timeout)
     @Operation(summary = "Send invoice PDF via email")
     @PostMapping(
             value = "/sendinvoice",
@@ -63,15 +64,17 @@ public class InvoiceController {
     public ResponseEntity<String> sendInvoice(
             @RequestParam("file") MultipartFile file,
             @RequestParam("email") String customerEmail
-    ) {
-        try {
-            emailService.sendInvoiceEmail(customerEmail, file);
-            return ResponseEntity.ok("Invoice sent successfully!");
-        } catch (Exception e) {
-            log.error("Failed to send invoice email to {}", customerEmail, e);
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Failed to send invoice: " + e.getMessage());
-        }
+    ) throws IOException {
+
+        byte[] fileBytes = file.getBytes();           // ✅ copy while request alive
+        String filename = file.getOriginalFilename(); // ✅ safe
+
+        emailService.sendInvoiceEmailAsync(
+                customerEmail,
+                fileBytes,
+                filename
+        );
+
+        return ResponseEntity.ok("Invoice email queued successfully!");
     }
 }
